@@ -1,5 +1,7 @@
 import sys
 from socket import *
+from os.path import *
+from os import listdir
 from threading import *
 
 
@@ -17,44 +19,103 @@ def read_conf():
 
 
 def is_malformed(msg, http):
-    request_line = msg.split('\n')[0].split(" ")
-    headers = msg.split('\n\n')[0]
+    request_line = [i.strip() for i in msg.split("\n")[0].split(" ")]
+    headers = [i.rstrip() for i in msg.split("\n")[1:]]
+    body = msg.split("\r\n\r\n")[1]
+
+    # TODO: Add remaining cases (for PUT, and connection for HTTP/1.1) and
+    # check if GET has body. Check for duplicate headers
 
     # if request_line[0] != "GET" or request_line[0] != "PUT" \
     #     or request_line[0] != "DELETE" or request_line[0] != "NTW21INFO":
 
     #     return True
 
+    if len(request_line) != 3:
+        return True
+
     if request_line[1][0] != "/":
-        return False
+        return True
 
-    if request_line[2] != "HTTP/1.0" or request_line[2] != "HTTP/1.1":
-        return False
+    if request_line[2] != "HTTP/1.1" and request_line[2] != "HTTP/1.0":
+        return True
+
+    if request_line[0] == "GET" and body:
+        return True
 
 
-def read_request(msg, hosts):
-    HOST = hosts[0]
+    if request_line[2] == "HTTP/1.1":
+        found = False
 
-    method = msg.split(" ")[0]
-    url = msg.split(" ")[1]
-    http = msg.split(" ")[2]
+        for i in headers:
+            if i.split(":")[0] == "Host" and i.split(":")[1]:
+                found = True
+
+        if not found:
+            return True
+
+    return False
+
+
+def parse_request(msg, hosts):
+    method = msg.split(" ")[0].rstrip()
+    url = msg.split(" ")[1].rstrip()
+    http = msg.split(" ")[2].rstrip()
 
     if is_malformed(msg, http):
         return 400
-    elif method[0] != "GET" or method[0] != "PUT" \
-        or method[0] != "DELETE" or method[0] != "NTW21INFO":
 
-        return 403
+    if method != "GET" and method != "PUT" \
+            and method != "DELETE" and method != "NTW21INFO":
+        return 405
 
     if method == "GET":
-        read_GET(msg)
-        
+        res = read_GET(msg, hosts)
+        return res
+
+
+# Parsers
+
+def read_GET(msg, hosts):
+    request_line = [i.strip() for i in msg.split("\n")[0].split(" ")]
+    headers = [i.rstrip() for i in msg.split("\n")[1:]]
+
+    if request_line[1] == "/":
+        return 403
+
+    tmp_host = ""
+    tmp_file = request_line[1][1:]
+
+    for i in headers:
+        if i.split(":")[0] == "Host":
+            tmp_host = i.split(": ")[1]
+
+    for i in hosts:
+        if i[0] == tmp_host:
+            HOST = tmp_host
+            break
+    else:
+        return 404
+
+    files = [f for f in listdir(f"./{HOST}") if isfile(join(f"./{HOST}", f))]
+
+    if tmp_file in files:
+        return 200
+    else:
+        return 404
+
+
+# Global variables
+
+hosts = read_conf()
+
+PORT = 80
+HOST = hosts[0]
+
+
+# Driver code
 
 if __name__ == "__main__":
-    hosts = read_conf()
-
-    PORT = 80
-
     if len(sys.argv) > 1:
         PORT = int(sys.argv[1])
 
@@ -68,13 +129,9 @@ if __name__ == "__main__":
             client_socket, addr = socket.accept()
             print(f"Connection from {addr} has been established.")
 
-            req = client_socket.recv(1024)
+            msg = client_socket.recv(1024).decode()
 
-            # read_request(req, hosts)
-            print(r'%s' %req)
-            
-            for i in req.splitlines():
-                print(r'%s' %i)
-
+            print(parse_request(msg, hosts))
+            print(msg)
 
             client_socket.close()
