@@ -34,7 +34,8 @@ def is_malformed(msg, http):
         http (String): The HTTP protocol of the request
 
     Returns:
-        Boolean: Return true if the request is malformed, false otherwise
+        Boolean or Int: Return true or a status code if the request is malformed,
+                        false otherwise
     """
     request_line = [i.strip() for i in msg.split("\n")[0].split(" ")]
     headers = [i.rstrip() for i in msg.split("\n")[1:]]
@@ -84,25 +85,41 @@ def parse_request(msg, hosts):
         List: An array of information about the response, including status code,
               filename, file length, and file type
     """
-    method = msg.split(" ")[0].rstrip()
-    url = msg.split(" ")[1].rstrip()
-    http = msg.split(" ")[2].rstrip()
+    request_line = [i.strip() for i in msg.split("\n")[0].split(" ")]
+    headers = [i.rstrip() for i in msg.split("\n")[1:]]
+
+    method = request_line[0]
+    url = request_line[1]
+    http = request_line[2]
+    
     code = is_malformed(msg, http)
 
-    # TODO: Generate correct responses
-
     if code == 505:
-        return [505]
+        return respond_Error(505, http)
     elif code == True:
-        return [400]
+        print(http)
+        return respond_Error(400, http)
 
     if method != "GET" and method != "PUT" \
             and method != "DELETE" and method != "NTW21INFO":
-        return [405]
+
+        if method == "PATCH" or method == "POST":
+            return respond_Error(405, http)
+
+        return respond_Error(501, http)
 
     if method == "GET":
         req = read_GET(msg, hosts)
         return respond_GET(req)
+    elif method == "PUT":
+        req = read_PUT(msg, hosts)
+        return respond_PUT(req)
+    elif method == "DELETE":
+        req = read_DELETE(msg, hosts)
+        return respond_DELETE(req)
+    elif method == "NTW21INFO":
+        req = read_NTW(msg, hosts)
+        return respond_NTW(req)
 
 
 # Parsers
@@ -115,14 +132,11 @@ def read_GET(msg, hosts):
         hosts (List): The array of hosts
 
     Returns:
-        List: An array of information about the response, including status code,
+        List: An array of information about the request, including status code,
               filename, file length, and file type
     """
     request_line = [i.strip() for i in msg.split("\n")[0].split(" ")]
     headers = [i.rstrip() for i in msg.split("\n")[1:]]
-
-    if request_line[1] == "/":
-        return [403, request_line[2]]
 
     tmp_host = ""
     tmp_file = request_line[1][1:]
@@ -132,8 +146,8 @@ def read_GET(msg, hosts):
             tmp_host = i.split(": ")[1]
 
     for i in hosts:
-        if tmp_host == "localhost:8080":
-            HOST = "edoardoriggio.ch"
+        if tmp_host == f"localhost:{PORT}":
+            HOST = hosts[0][0]
             break
         if i[0] == tmp_host:
             HOST = tmp_host
@@ -144,6 +158,18 @@ def read_GET(msg, hosts):
     files = [f for f in os.listdir(f"./{HOST}")
              if isfile(join(f"./{HOST}", f))]
 
+    if request_line[1] == "/":
+        root_file = ""
+
+        for i in hosts:
+            if i[0] == HOST:
+                root_file = i[1]
+
+        length = os.stat(f"./{HOST}/{root_file}").st_size
+        ext = os.path.splitext(f"./{HOST}/{root_file}")[1]
+
+        return [200, request_line[2], f"./{HOST}/{root_file}", length, ext]
+
     if tmp_file in files:
         length = os.stat(f"./{HOST}/{tmp_file}").st_size
         ext = os.path.splitext(f"./{HOST}/{tmp_file}")[1]
@@ -153,13 +179,103 @@ def read_GET(msg, hosts):
         return [404, request_line[2]]
 
 
-# Responses
-
-def respond_GET(req):
-    """Generate a response based on the given request
+def read_NTW(msg, hosts):
+    """Parse the NTW21INFO request and send data to the response generator function
 
     Args:
-        req (String): The request
+        msg (String): The request message to parse
+        hosts (List): The array of hosts
+
+    Returns:
+        List: An array of information about the request, including status code,
+              filename, file length, and file type
+    """
+    request_line = [i.strip() for i in msg.split("\n")[0].split(" ")]
+    headers = [i.rstrip() for i in msg.split("\n")[1:]]
+
+    tmp_host = ""
+    admin = ""
+    email = ""
+
+    for i in headers:
+        if i.split(":")[0] == "Host":
+            tmp_host = i.split(": ")[1]
+
+    for i in hosts:
+        if tmp_host == f"localhost:{PORT}":
+            HOST = hosts[0][0]
+            break
+        if i[0] == tmp_host:
+            HOST = tmp_host
+            break
+    else:
+        return [404, request_line[2]]
+
+    for i in hosts:
+        if i[0] == HOST:
+            admin = i[2]
+            email = i[3]
+
+    content = f"The administrator of {HOST} is {admin}.\n" + \
+        f"You can contact him at {email}."
+
+    with open("tmp.txt", "x") as f:
+        f.write(content)
+        f.close()
+
+    length = os.stat("./tmp.txt").st_size
+    os.remove("tmp.txt")
+
+    return [200, request_line[2], content, length, ".txt"]
+
+
+def read_DELETE(msg, hosts):
+    request_line = [i.strip() for i in msg.split("\n")[0].split(" ")]
+    headers = [i.rstrip() for i in msg.split("\n")[1:]]
+
+    tmp_host = ""
+    tmp_file = request_line[1][1:]
+
+    for i in headers:
+        if i.split(":")[0] == "Host":
+            tmp_host = i.split(": ")[1]
+
+    for i in hosts:
+        if tmp_host == f"localhost:{PORT}":
+            HOST = hosts[0][0]
+            break
+        if i[0] == tmp_host:
+            HOST = tmp_host
+            break
+    else:
+        return [404, request_line[2]]
+
+    files = [f for f in os.listdir(f"./{HOST}")
+             if isfile(join(f"./{HOST}", f))]
+    
+    if tmp_file in files:
+        return [204, request_line[2], f"./{HOST}/{tmp_file}"]
+    else:
+        return [404, request_line[2]]
+
+
+# Responses
+
+def respond_Error(code, protocol):
+    msg = f"{protocol} {code} {STATUS_CODES[code]}\r\n" + \
+        f"Date: {DATE}\r\nServer: {SERVER}\r\n\r\n"
+
+    print(msg)
+
+    return [msg.encode()]
+
+
+def respond_GET(req):
+    """Generate a response based on the given GET request
+
+    Args:
+        req (List): An array of information about the request, including status code,
+              filename, file length, and file type
 
     Returns:
         List: An array containing the response, and the binary representation
@@ -200,7 +316,45 @@ def respond_GET(req):
     return [msg.encode()]
 
 
+def respond_NTW(req):
+    """Generate a response based on the given NTW21INFO request
+
+    Args:
+        req (List): An array of information about the request, including status code,
+              filename, file length, and file type
+
+    Returns:
+        List: An array containing the response, and the binary representation
+              of data (if any)
+    """
+    code = req[0]
+    protocol = req[1]
+
+    msg = f"{protocol} {code} {STATUS_CODES[code]}\r\n"
+
+    if code == 200:
+        length = req[3]
+        ext = FILE_TYPES[req[4]]
+
+        msg += f"Date: {DATE}\r\nServer: {SERVER}\r\n" + \
+            f"Content-Length: {length}\r\nContent-Type: {ext}\r\n\r\n" + \
+            req[2]
+
+        return [msg.encode()]
+    else:
+        msg += f"Date: {DATE}\r\nServer: {SERVER}\r\n\r\n"
+
+    return [msg.encode()]
+
+
+def respond_DELETE(req):
+    pass
+    #
+
+
+
 # Global variables
+
 
 hosts = read_conf()
 
@@ -209,6 +363,7 @@ HOST = hosts[0]
 STATUS_CODES = {
     200: "OK",
     201: "Created",
+    204: "No Content",
     400: "Bad Request",
     403: "Forbidden",
     404: "Not Found",
@@ -218,6 +373,7 @@ STATUS_CODES = {
 }
 FILE_TYPES = {
     ".html": "text/html",
+    ".txt": "text/plain",
     ".png": "image/png",
     ".jpg": "image/jpg"
 }
@@ -250,6 +406,6 @@ if __name__ == "__main__":
             if len(resp) > 1:
                 client_socket.sendall(resp[1])
 
-            print(msg.encode())
+            # print(msg.encode())
 
             client_socket.close()
