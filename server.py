@@ -7,6 +7,11 @@ from threading import *
 
 
 def read_conf():
+    """Read the vhost file
+
+    Returns:
+        list: An array of vhost values
+    """
     vhosts = []
     file = "vhosts.conf"
 
@@ -22,6 +27,15 @@ def read_conf():
 
 
 def is_malformed(msg, http):
+    """Given a message and an http protocol, check if the request is malformed 
+
+    Args:
+        msg (String): The request message
+        http (String): The HTTP protocol of the request
+
+    Returns:
+        Boolean: Return true if the request is malformed, false otherwise
+    """
     request_line = [i.strip() for i in msg.split("\n")[0].split(" ")]
     headers = [i.rstrip() for i in msg.split("\n")[1:]]
     body = msg.split("\r\n\r\n")[1]
@@ -60,19 +74,31 @@ def is_malformed(msg, http):
 
 
 def parse_request(msg, hosts):
+    """Given a request, parse it and return the status code
+
+    Args:
+        msg (String): The request message to parse
+        hosts (List): The array of hosts
+
+    Returns:
+        List: An array of information about the response, including status code,
+              filename, file length, and file type
+    """
     method = msg.split(" ")[0].rstrip()
     url = msg.split(" ")[1].rstrip()
     http = msg.split(" ")[2].rstrip()
     code = is_malformed(msg, http)
 
+    # TODO: Generate correct responses
+
     if code == 505:
-        return 505
+        return [505]
     elif code == True:
-        return 400
+        return [400]
 
     if method != "GET" and method != "PUT" \
             and method != "DELETE" and method != "NTW21INFO":
-        return 405
+        return [405]
 
     if method == "GET":
         req = read_GET(msg, hosts)
@@ -82,6 +108,16 @@ def parse_request(msg, hosts):
 # Parsers
 
 def read_GET(msg, hosts):
+    """Parse the GET request and send data to the response generator function
+
+    Args:
+        msg (String): The request message to parse
+        hosts (List): The array of hosts
+
+    Returns:
+        List: An array of information about the response, including status code,
+              filename, file length, and file type
+    """
     request_line = [i.strip() for i in msg.split("\n")[0].split(" ")]
     headers = [i.rstrip() for i in msg.split("\n")[1:]]
 
@@ -120,6 +156,15 @@ def read_GET(msg, hosts):
 # Responses
 
 def respond_GET(req):
+    """Generate a response based on the given request
+
+    Args:
+        req (String): The request
+
+    Returns:
+        List: An array containing the response, and the binary representation
+              of data (if any)
+    """
     code = req[0]
     protocol = req[1]
 
@@ -139,7 +184,7 @@ def respond_GET(req):
 
             msg += f"Date: {DATE}\r\nServer: {SERVER}\r\n" + \
                 f"Content-Length: {length}\r\nContent-Type: {ext}\r\n\r\n"
-            
+
             return [msg.encode(), content]
         else:
             with open(file, "r") as f:
@@ -204,7 +249,7 @@ if __name__ == "__main__":
 
             if len(resp) > 1:
                 client_socket.sendall(resp[1])
-            
+
             print(msg.encode())
 
             client_socket.close()
