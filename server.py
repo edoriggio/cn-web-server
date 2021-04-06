@@ -91,7 +91,7 @@ def parse_request(msg, hosts):
     method = request_line[0]
     url = request_line[1]
     http = request_line[2]
-    
+
     code = is_malformed(msg, http)
 
     if code == 505:
@@ -170,10 +170,14 @@ def read_GET(msg, hosts):
 
         return [200, request_line[2], f"./{HOST}/{root_file}", length, ext]
 
-    if tmp_file in files:
-        length = os.stat(f"./{HOST}/{tmp_file}").st_size
-        ext = os.path.splitext(f"./{HOST}/{tmp_file}")[1]
+    if os.path.exists(f"./{HOST}/{tmp_file}"):
+        if os.path.isdir(f"./{HOST}/{tmp_file}"):
+            return [403, request_line[2]]
+        else:
+            ext = os.path.splitext(f"./{HOST}/{tmp_file}")[1]
 
+        length = os.stat(f"./{HOST}/{tmp_file}").st_size
+        
         return [200, request_line[2], f"./{HOST}/{tmp_file}", length, ext]
     else:
         return [404, request_line[2]]
@@ -230,6 +234,58 @@ def read_NTW(msg, hosts):
 
 
 def read_DELETE(msg, hosts):
+    """Parse the DELETE request and send data to the response generator function
+
+    Args:
+        msg (String): The request message to parse
+        hosts (List): The array of hosts
+
+    Returns:
+        List: An array of information about the request, including status code,
+              filename, file length, and file type
+    """
+    request_line = [i.strip() for i in msg.split("\n")[0].split(" ")]
+    headers = [i.rstrip() for i in msg.split("\n")[1:]]
+
+    tmp_host = ""
+    tmp_file = request_line[1][1:]
+
+    for i in headers:
+        if i.split(":")[0] == "Host":
+            tmp_host = i.split(": ")[1]
+
+    for i in hosts:
+        if tmp_host == f"localhost:{PORT}":
+            HOST = hosts[0][0]
+            break
+        if i[0] == tmp_host:
+            HOST = tmp_host
+            break
+    else:
+        return [404, request_line[2]]
+
+    if os.path.exists(f"./{HOST}/{tmp_file}"):
+        if os.path.isdir(f"./{HOST}/{tmp_file}"):
+            os.rmdir(f"./{HOST}/{tmp_file}")
+        else:
+            os.remove(f"./{HOST}/{tmp_file}")
+
+        return [204, request_line[2], f"./{HOST}/{tmp_file}"]
+    else:
+        return [404, request_line[2]]
+
+
+def read_PUT(msg, hosts):
+    """Parse the PUT request and send data to the response generator function
+
+    Args:
+        msg (String): The request message to parse
+        hosts (List): The array of hosts
+
+    Returns:
+        List: An array of information about the request, including status code,
+              filename, file length, and file type
+    """
     request_line = [i.strip() for i in msg.split("\n")[0].split(" ")]
     headers = [i.rstrip() for i in msg.split("\n")[1:]]
 
@@ -252,16 +308,32 @@ def read_DELETE(msg, hosts):
 
     files = [f for f in os.listdir(f"./{HOST}")
              if isfile(join(f"./{HOST}", f))]
-    
-    if tmp_file in files:
-        return [204, request_line[2], f"./{HOST}/{tmp_file}"]
-    else:
-        return [404, request_line[2]]
 
+    if os.path.isdir(f"./{HOST}/{tmp_file}"):
+        return [403, request_line[2]]
+
+    if os.path.exists(f"./{HOST}/{tmp_file}"):
+        os.remove(f"./{HOST}/{tmp_file}")
+        
+    with open(f"./{HOST}/{tmp_file}", "w") as f:
+        f.write(msg.split("\r\n\r\n")[1])
+        f.close()
+    
+    return [201, request_line[2], f"./{HOST}/{tmp_file}"]
+        
 
 # Responses
 
 def respond_Error(code, protocol):
+    """Generate a response based on the given error code
+
+    Args:
+        req (List): An array of information about the request, including status code,
+              filename, file length, and file type
+
+    Returns:
+        List: An array containing the response
+    """
     msg = f"{protocol} {code} {STATUS_CODES[code]}\r\n" + \
         f"Date: {DATE}\r\nServer: {SERVER}\r\n\r\n"
 
@@ -348,14 +420,26 @@ def respond_NTW(req):
 
 
 def respond_DELETE(req):
-    pass
-    #
+    """Generate a response based on the given DELETE request
 
+    Args:
+        req (List): An array of information about the request, including status code,
+              filename, file length, and file type
+
+    Returns:
+        List: An array containing the response, and the binary representation
+              of data (if any)
+    """
+    code = req[0]
+    protocol = req[1]
+
+    msg = f"{protocol} {code} {STATUS_CODES[code]}\r\n" + \
+        f"Date: {DATE}\r\nServer: {SERVER}\r\n\r\n"
+
+    return [msg.encode()]
 
 
 # Global variables
-
-
 hosts = read_conf()
 
 PORT = 80
