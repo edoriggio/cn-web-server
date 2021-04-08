@@ -134,6 +134,8 @@ def parse_request(msg, hosts):
     request_line = [i.strip() for i in msg.split("\n")[0].split(" ")]
     headers = [i.rstrip() for i in msg.split("\n")[1:-2]]
 
+    print(request_line)
+
     method = request_line[0]
     http = request_line[2]
     connection = ""
@@ -546,15 +548,12 @@ if __name__ == "__main__":
 
             client_socket.sendall(resp[0])
 
-            if resp[1] == "close" or resp[0].decode().split(" ")[0] == "HTTP/1.0":
-                print("closing socket")
-                client_socket.close()
-                break
-
             if len(resp) > 2:
                 client_socket.sendall(resp[2])
 
-            if not msg:
+            if resp[1] == "close" or resp[0].decode().split(" ")[0] == "HTTP/1.0":
+                print("closing socket")
+                client_socket.close()
                 break
 
             print(msg.encode())
