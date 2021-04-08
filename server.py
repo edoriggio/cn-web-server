@@ -3,7 +3,6 @@ import sys
 import datetime
 from socket import *
 from os.path import *
-from threading import *
 
 
 def read_conf():
@@ -26,50 +25,97 @@ def read_conf():
     return vhosts
 
 
-def is_malformed(msg, http):
-    """Given a message and an http protocol, check if the request is malformed 
+def is_malformed(msg):
+    """Given a message and an http protocol, check if the request is malformed
 
     Args:
         msg (String): The request message
-        http (String): The HTTP protocol of the request
 
     Returns:
         Boolean or Int: Return true or a status code if the request is malformed,
                         false otherwise
     """
     request_line = [i.strip() for i in msg.split("\n")[0].split(" ")]
-    headers = [i.rstrip() for i in msg.split("\n")[1:]]
+    headers = [i.rstrip() for i in msg.split("\n")[1:-2]]
     body = msg.split("\r\n\r\n")[1]
 
-    # TODO: Add remaining cases (for PUT, and connection for HTTP/1.1) and
-    # check if GET has body. Check for duplicate headers
-
-    # if request_line[0] != "GET" or request_line[0] != "PUT" \
-    #     or request_line[0] != "DELETE" or request_line[0] != "NTW21INFO":
-
-    #     return True
-
     if len(request_line) != 3:
-        return True
+        return 400
+
+    if request_line[0] != "GET" and request_line[0] != "PUT" \
+            and request_line[0] != "DELETE" and request_line[0] != "NTW21INFO":
+
+        if request_line[0] == "PATCH" or request_line[0] == "POST":
+            return 405
+
+        return 501
 
     if request_line[1][0] != "/":
-        return True
+        return 400
 
     if request_line[2] != "HTTP/1.1" and request_line[2] != "HTTP/1.0":
         return 505
 
-    if request_line[0] == "GET" and body:
-        return True
+    if (request_line[0] == "GET" or request_line[0] == "DELETE"
+            or request_line[0] == "NTW21INFO") and body:
+
+        return 400
+
+    for i in range(len(headers) - 1):
+        for j in range(i + 1, len(headers)):
+            if headers[i].split(": ")[0] == headers[j].split(": ")[0]:
+                return 400
+
+    if request_line[0] == "PUT":
+        found = False
+        found_type = False
+        length_req = 0
+        content = ""
+
+        if not body:
+            return 400
+
+        for i in headers:
+            if i.split(": ")[0] == "Content-Length" and i.split(": ")[1]:
+                found = True
+                length_req = i.split(": ")[1]
+                content = body
+            if i.split(": ")[0] == "Content-Type" and i.split(": ")[1]:
+                found_type = True
+
+        if not found or not found_type:
+            return 400
+        else:
+            with open("tmp.txt", "x") as f:
+                f.write(content)
+                f.close()
+
+            length = os.stat("./tmp.txt").st_size
+            os.remove("tmp.txt")
+
+            if length != int(length_req):
+                return 400
+
+    if request_line[0] != "PUT":
+        for i in headers:
+            if i.split(": ")[0] == "Content-Length" and i.split(": ")[1]:
+                return 400
 
     if request_line[2] == "HTTP/1.1":
         found = False
+        found_conn = False
 
         for i in headers:
-            if i.split(":")[0] == "Host" and i.split(":")[1]:
+            if i.split(": ")[0] == "Host" and i.split(": ")[1]:
                 found = True
 
-        if not found:
-            return True
+            if i.split(": ")[0] == "Connection" and \
+                    (i.split(": ")[1] == "keep-alive" or i.split(": ")[1] == "close"):
+
+                found_conn = True
+
+        if found == False or found_conn == False:
+            return 400
 
     return False
 
@@ -86,40 +132,34 @@ def parse_request(msg, hosts):
               filename, file length, and file type
     """
     request_line = [i.strip() for i in msg.split("\n")[0].split(" ")]
-    headers = [i.rstrip() for i in msg.split("\n")[1:]]
+    headers = [i.rstrip() for i in msg.split("\n")[1:-2]]
 
     method = request_line[0]
-    url = request_line[1]
     http = request_line[2]
+    connection = ""
 
-    code = is_malformed(msg, http)
+    code = is_malformed(msg)
 
-    if code == 505:
-        return respond_Error(505, http)
-    elif code == True:
-        print(http)
-        return respond_Error(400, http)
+    if code != False:
+        return respond_Error(code, http)
 
-    if method != "GET" and method != "PUT" \
-            and method != "DELETE" and method != "NTW21INFO":
-
-        if method == "PATCH" or method == "POST":
-            return respond_Error(405, http)
-
-        return respond_Error(501, http)
+    if http == "HTTP/1.1":
+        for i in headers:
+            if i.split(": ")[0] == "Connection" and i.split(": ")[1]:
+                connection = i.split(": ")[1]
 
     if method == "GET":
         req = read_GET(msg, hosts)
-        return respond_GET(req)
+        return respond_GET(req, connection)
     elif method == "PUT":
         req = read_PUT(msg, hosts)
-        return respond_PUT(req)
+        return respond_PUT(req, connection)
     elif method == "DELETE":
         req = read_DELETE(msg, hosts)
-        return respond_DELETE(req)
+        return respond_DELETE(req, connection)
     elif method == "NTW21INFO":
         req = read_NTW(msg, hosts)
-        return respond_NTW(req)
+        return respond_NTW(req, connection)
 
 
 # Parsers
@@ -155,9 +195,6 @@ def read_GET(msg, hosts):
     else:
         return [404, request_line[2]]
 
-    files = [f for f in os.listdir(f"./{HOST}")
-             if isfile(join(f"./{HOST}", f))]
-
     if request_line[1] == "/":
         root_file = ""
 
@@ -177,7 +214,7 @@ def read_GET(msg, hosts):
             ext = os.path.splitext(f"./{HOST}/{tmp_file}")[1]
 
         length = os.stat(f"./{HOST}/{tmp_file}").st_size
-        
+
         return [200, request_line[2], f"./{HOST}/{tmp_file}", length, ext]
     else:
         return [404, request_line[2]]
@@ -291,6 +328,7 @@ def read_PUT(msg, hosts):
 
     tmp_host = ""
     tmp_file = request_line[1][1:]
+    code = 201
 
     for i in headers:
         if i.split(":")[0] == "Host":
@@ -306,21 +344,22 @@ def read_PUT(msg, hosts):
     else:
         return [404, request_line[2]]
 
-    files = [f for f in os.listdir(f"./{HOST}")
-             if isfile(join(f"./{HOST}", f))]
+    path = tmp_file.split("/")
 
-    if os.path.isdir(f"./{HOST}/{tmp_file}"):
-        return [403, request_line[2]]
+    for i in range(len(path)):
+        if i == len(path) - 1:
+            if os.path.exists(f"./{HOST}/{'/'.join(path[:(i + 1)])}"):
+                code = 200
 
-    if os.path.exists(f"./{HOST}/{tmp_file}"):
-        os.remove(f"./{HOST}/{tmp_file}")
-        
-    with open(f"./{HOST}/{tmp_file}", "w") as f:
-        f.write(msg.split("\r\n\r\n")[1])
-        f.close()
-    
-    return [201, request_line[2], f"./{HOST}/{tmp_file}"]
-        
+            with open(f"./{HOST}/{'/'.join(path[:(i + 1)])}", "w") as f:
+                f.write(msg.split("\r\n\r\n")[1])
+                f.close()
+        else:
+            if not os.path.exists(f"./{HOST}/{'/'.join(path[:(i + 1)])}"):
+                os.mkdir(f"./{HOST}/{'/'.join(path[:(i + 1)])}")
+
+    return [code, request_line[2], f"/{HOST}/{tmp_file}"]
+
 
 # Responses
 
@@ -337,12 +376,10 @@ def respond_Error(code, protocol):
     msg = f"{protocol} {code} {STATUS_CODES[code]}\r\n" + \
         f"Date: {DATE}\r\nServer: {SERVER}\r\n\r\n"
 
-    print(msg)
-
-    return [msg.encode()]
+    return [msg.encode(), "close"]
 
 
-def respond_GET(req):
+def respond_GET(req, connection):
     """Generate a response based on the given GET request
 
     Args:
@@ -373,7 +410,7 @@ def respond_GET(req):
             msg += f"Date: {DATE}\r\nServer: {SERVER}\r\n" + \
                 f"Content-Length: {length}\r\nContent-Type: {ext}\r\n\r\n"
 
-            return [msg.encode(), content]
+            return [msg.encode(), connection, content]
         else:
             with open(file, "r") as f:
                 content = f.read()
@@ -385,10 +422,10 @@ def respond_GET(req):
     else:
         msg += f"Date: {DATE}\r\nServer: {SERVER}\r\n\r\n"
 
-    return [msg.encode()]
+    return [msg.encode(), connection]
 
 
-def respond_NTW(req):
+def respond_NTW(req, connection):
     """Generate a response based on the given NTW21INFO request
 
     Args:
@@ -411,15 +448,13 @@ def respond_NTW(req):
         msg += f"Date: {DATE}\r\nServer: {SERVER}\r\n" + \
             f"Content-Length: {length}\r\nContent-Type: {ext}\r\n\r\n" + \
             req[2]
-
-        return [msg.encode()]
     else:
         msg += f"Date: {DATE}\r\nServer: {SERVER}\r\n\r\n"
 
-    return [msg.encode()]
+    return [msg.encode(), connection]
 
 
-def respond_DELETE(req):
+def respond_DELETE(req, connection):
     """Generate a response based on the given DELETE request
 
     Args:
@@ -436,10 +471,33 @@ def respond_DELETE(req):
     msg = f"{protocol} {code} {STATUS_CODES[code]}\r\n" + \
         f"Date: {DATE}\r\nServer: {SERVER}\r\n\r\n"
 
-    return [msg.encode()]
+    return [msg.encode(), connection]
+
+
+def respond_PUT(req, connection):
+    """Generate a response based on the given PUT request
+
+    Args:
+        req (List): An array of information about the request, including status code,
+              filename, file length, and file type
+
+    Returns:
+        List: An array containing the response, and the binary representation
+              of data (if any)
+    """
+    code = req[0]
+    protocol = req[1]
+    destination = req[2]
+
+    msg = f"{protocol} {code} {STATUS_CODES[code]}\r\n" + \
+        f"Date: {DATE}\r\nServer: {SERVER}\r\n" + \
+        f"Content-Location: {destination}\r\n\r\n"
+
+    return [msg.encode(), connection]
 
 
 # Global variables
+
 hosts = read_conf()
 
 PORT = 80
@@ -466,30 +524,37 @@ DATE = datetime.datetime.now(datetime.timezone.utc) \
 SERVER = "Roma Capoccia"
 
 
-# Driver code
-
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         PORT = int(sys.argv[1])
 
-    with socket(AF_INET, SOCK_STREAM) as socket:
-        socket.bind(("", PORT))
-        socket.listen(1)
+    s = socket(AF_INET, SOCK_STREAM)
+    s.bind(("", PORT))
+    s.listen(1)
 
-        print(f"Server is up and available on port {PORT}")
+    print(f"Server is up and available on port {PORT}")
+
+    while True:
+        client_socket, addr = s.accept()
 
         while True:
-            client_socket, addr = socket.accept()
             print(f"Connection from {addr} has been established.")
 
             msg = client_socket.recv(1024).decode()
+
             resp = parse_request(msg, hosts)
 
             client_socket.sendall(resp[0])
 
-            if len(resp) > 1:
-                client_socket.sendall(resp[1])
+            if resp[1] == "close" or resp[0].decode().split(" ")[0] == "HTTP/1.0":
+                print("closing socket")
+                client_socket.close()
+                break
 
-            # print(msg.encode())
+            if len(resp) > 2:
+                client_socket.sendall(resp[2])
 
-            client_socket.close()
+            if not msg:
+                break
+
+            print(msg.encode())
