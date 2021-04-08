@@ -32,8 +32,7 @@ def is_malformed(msg):
         msg (String): The request message
 
     Returns:
-        Boolean or Int: Return true or a status code if the request is malformed,
-                        false otherwise
+        Boolean or Int: Return false or a status code if the request is malformed
     """
     request_line = [i.strip() for i in msg.split("\n")[0].split(" ")]
     headers = [i.rstrip() for i in msg.split("\n")[1:-2]]
@@ -129,7 +128,7 @@ def parse_request(msg, hosts):
 
     Returns:
         List: An array of information about the response, including status code,
-              filename, file length, and file type
+              filename, file length, file type and connection type
     """
     request_line = [i.strip() for i in msg.split("\n")[0].split(" ")]
     headers = [i.rstrip() for i in msg.split("\n")[1:-2]]
@@ -175,7 +174,7 @@ def read_GET(msg, hosts):
 
     Returns:
         List: An array of information about the request, including status code,
-              filename, file length, and file type
+              filename, file length, file type and connection type
     """
     request_line = [i.strip() for i in msg.split("\n")[0].split(" ")]
     headers = [i.rstrip() for i in msg.split("\n")[1:]]
@@ -189,6 +188,7 @@ def read_GET(msg, hosts):
 
     for i in hosts:
         if tmp_host == f"localhost:{PORT}":
+            # CHANGE THIS LINE IN ORDER TO SEE A STUDENT'S WEBSITE IN THE BROWSER
             HOST = hosts[0][0]
             break
         if i[0] == tmp_host:
@@ -231,7 +231,7 @@ def read_NTW(msg, hosts):
 
     Returns:
         List: An array of information about the request, including status code,
-              filename, file length, and file type
+              filename, file length, file type and connection type
     """
     request_line = [i.strip() for i in msg.split("\n")[0].split(" ")]
     headers = [i.rstrip() for i in msg.split("\n")[1:]]
@@ -281,7 +281,7 @@ def read_DELETE(msg, hosts):
 
     Returns:
         List: An array of information about the request, including status code,
-              filename, file length, and file type
+              filename, file length, file type and connection type
     """
     request_line = [i.strip() for i in msg.split("\n")[0].split(" ")]
     headers = [i.rstrip() for i in msg.split("\n")[1:]]
@@ -323,7 +323,7 @@ def read_PUT(msg, hosts):
 
     Returns:
         List: An array of information about the request, including status code,
-              filename, file length, and file type
+              filename, file length, file type and connection type
     """
     request_line = [i.strip() for i in msg.split("\n")[0].split(" ")]
     headers = [i.rstrip() for i in msg.split("\n")[1:]]
@@ -373,7 +373,7 @@ def respond_Error(code, protocol):
               filename, file length, and file type
 
     Returns:
-        List: An array containing the response
+        List: An array containing the response and the connection type
     """
     msg = f"{protocol} {code} {STATUS_CODES[code]}\r\n" + \
         f"Date: {DATE}\r\nServer: {SERVER}\r\n\r\n"
@@ -389,8 +389,8 @@ def respond_GET(req, connection):
               filename, file length, and file type
 
     Returns:
-        List: An array containing the response, and the binary representation
-              of data (if any)
+        List: An array containing the response, the binary representation
+              of data (if any) and the connection type
     """
     code = req[0]
     protocol = req[1]
@@ -435,8 +435,8 @@ def respond_NTW(req, connection):
               filename, file length, and file type
 
     Returns:
-        List: An array containing the response, and the binary representation
-              of data (if any)
+        List: An array containing the response, the binary representation
+              of data (if any) and the connection type
     """
     code = req[0]
     protocol = req[1]
@@ -464,8 +464,8 @@ def respond_DELETE(req, connection):
               filename, file length, and file type
 
     Returns:
-        List: An array containing the response, and the binary representation
-              of data (if any)
+        List: An array containing the response, the binary representation
+              of data (if any) and the connection type
     """
     code = req[0]
     protocol = req[1]
@@ -484,8 +484,8 @@ def respond_PUT(req, connection):
               filename, file length, and file type
 
     Returns:
-        List: An array containing the response, and the binary representation
-              of data (if any)
+        List: An array containing the response, the binary representation
+              of data (if any) and the connection type
     """
     code = req[0]
     protocol = req[1]
@@ -555,5 +555,3 @@ if __name__ == "__main__":
                 print("closing socket")
                 client_socket.close()
                 break
-
-            print(msg.encode())
