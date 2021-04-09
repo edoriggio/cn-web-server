@@ -134,8 +134,6 @@ def parse_request(msg, hosts):
     request_line = [i.strip() for i in msg.split("\n")[0].split(" ")]
     headers = [i.rstrip() for i in msg.split("\n")[1:-2]]
 
-    print(request_line)
-
     method = request_line[0]
     http = request_line[2]
     connection = ""
@@ -548,7 +546,8 @@ def thread_function(client_socket, addr):
         if len(resp) > 2:
             client_socket.sendall(resp[2])
 
-        if resp[1] == "close" or resp[0].decode().split(" ")[0] == "HTTP/1.0":
+        if resp[1] == "close" or resp[0].decode().split(" ")[0] == "HTTP/1.0" \
+            or not msg:
             print("closing socket")
             client_socket.close()
             break
