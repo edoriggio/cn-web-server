@@ -11,8 +11,17 @@ python3 ./server.py {PORT_N}
 Where ```PORT_N``` is the port number (default is 80). In order to view one of the websites in the web browser, change the first index of hosts. 0 = Edoardo Riggio, 1 = Matteo Bernaschina, 2 = Matteo Alberici (located in server.py):
 
 ```python
-192   # CHANGE THIS LINE IN ORDER TO SEE A STUDENT'S WEBSITE IN THE BROWSER
-193   HOST = hosts[0][0]
+190   # CHANGE THIS LINE IN ORDER TO SEE A STUDENT'S WEBSITE IN THE BROWSER
+191   HOST = hosts[0][0]
+...
+248   # CHANGE THIS LINE IN ORDER TO SEE A STUDENT'S WEBSITE IN THE BROWSER
+249   HOST = hosts[0][0]
+...
+298   # CHANGE THIS LINE IN ORDER TO SEE A STUDENT'S WEBSITE IN THE BROWSER
+299   HOST = hosts[0][0]
+...
+342   # CHANGE THIS LINE IN ORDER TO SEE A STUDENT'S WEBSITE IN THE BROWSER
+343   HOST = hosts[0][0]
 ```
 
 ## Contributions

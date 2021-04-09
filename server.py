@@ -188,7 +188,7 @@ def read_GET(msg, hosts):
     for i in hosts:
         if tmp_host == f"localhost:{PORT}":
             # CHANGE THIS LINE IN ORDER TO SEE A STUDENT'S WEBSITE IN THE BROWSER
-            HOST = hosts[1][0]
+            HOST = hosts[0][0]
             break
         if i[0] == tmp_host:
             HOST = tmp_host
@@ -245,6 +245,7 @@ def read_NTW(msg, hosts):
 
     for i in hosts:
         if tmp_host == f"localhost:{PORT}":
+            # CHANGE THIS LINE IN ORDER TO SEE A STUDENT'S WEBSITE IN THE BROWSER
             HOST = hosts[0][0]
             break
         if i[0] == tmp_host:
@@ -294,6 +295,7 @@ def read_DELETE(msg, hosts):
 
     for i in hosts:
         if tmp_host == f"localhost:{PORT}":
+            # CHANGE THIS LINE IN ORDER TO SEE A STUDENT'S WEBSITE IN THE BROWSER
             HOST = hosts[0][0]
             break
         if i[0] == tmp_host:
@@ -337,6 +339,7 @@ def read_PUT(msg, hosts):
 
     for i in hosts:
         if tmp_host == f"localhost:{PORT}":
+            # CHANGE THIS LINE IN ORDER TO SEE A STUDENT'S WEBSITE IN THE BROWSER
             HOST = hosts[0][0]
             break
         if i[0] == tmp_host:
