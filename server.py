@@ -3,6 +3,7 @@ import sys
 import datetime
 from socket import *
 from os.path import *
+from concurrent.futures import ThreadPoolExecutor
 
 
 def read_conf():
@@ -189,7 +190,7 @@ def read_GET(msg, hosts):
     for i in hosts:
         if tmp_host == f"localhost:{PORT}":
             # CHANGE THIS LINE IN ORDER TO SEE A STUDENT'S WEBSITE IN THE BROWSER
-            HOST = hosts[0][0]
+            HOST = hosts[1][0]
             break
         if i[0] == tmp_host:
             HOST = tmp_host
@@ -526,6 +527,35 @@ DATE = datetime.datetime.now(datetime.timezone.utc) \
 SERVER = "Roma Capoccia"
 
 
+# Multithreading func
+
+def thread_function(client_socket, addr):
+    """ Function to be called everytime a new thread has been created
+
+    Args:
+        client_socket (socket): The client socket where the server needs to listen
+                                for HTTP requests
+        addr (Int): The client_socket address
+    """
+    while True:
+        print(f"Connection from {addr} has been established.")
+
+        msg = client_socket.recv(1024).decode()
+        resp = parse_request(msg, hosts)
+
+        client_socket.sendall(resp[0])
+
+        if len(resp) > 2:
+            client_socket.sendall(resp[2])
+
+        if resp[1] == "close" or resp[0].decode().split(" ")[0] == "HTTP/1.0":
+            print("closing socket")
+            client_socket.close()
+            break
+
+
+# Driver code
+
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         PORT = int(sys.argv[1])
@@ -536,22 +566,7 @@ if __name__ == "__main__":
 
     print(f"Server is up and available on port {PORT}")
 
-    while True:
-        client_socket, addr = s.accept()
-
+    with ThreadPoolExecutor() as pool:
         while True:
-            print(f"Connection from {addr} has been established.")
-
-            msg = client_socket.recv(1024).decode()
-
-            resp = parse_request(msg, hosts)
-
-            client_socket.sendall(resp[0])
-
-            if len(resp) > 2:
-                client_socket.sendall(resp[2])
-
-            if resp[1] == "close" or resp[0].decode().split(" ")[0] == "HTTP/1.0":
-                print("closing socket")
-                client_socket.close()
-                break
+            client_socket, addr = s.accept()
+            pool.submit(thread_function, client_socket, addr)

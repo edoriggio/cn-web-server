@@ -11,5 +11,5 @@ Where ```PORT_N``` is the port number.
 | Student            | Tasks                                                                           |
 |--------------------|---------------------------------------------------------------------------------|
 | Edoardo Riggio     | Task A, Task B, Task C, Task D, Task E, Task F, Task G, Task H, Optional Task A |
-| Matteo Alberici    | Task A, Task B, Task C, Task D, Task E, Task F, Task G, Task H                  |
+| Matteo Alberici    | Task A, Task B, Task C, Task D, Task E, Task F, Task G, Task H, Optional Task B |
 | Matteo Bernaschina | Task A, Task B, Task C, Task D, Task E, Task F, Task G, Task H                  |
