@@ -1,5 +1,9 @@
 # Roma Capoccia Web Server
 
+## Abstract
+
+This is a web server that works with a subsection of the HTTP methods. It is implemented using python 3 and only uses python's ```socket``` library to handle requests and send back resoponses. The server is also multithreaded and accepts both HTTP/1.0 and HTTP/1.1 requests (thus being able to keep sockets alive).
+
 ## Execution Steps
 
 In oder to run the server, just type in the terminal the following line
